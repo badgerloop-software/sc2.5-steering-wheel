@@ -236,6 +236,9 @@ void CANSteering::sendSteeringData() {
     Digital_Data local_digital_data = const_cast<Digital_Data&>(digital_data);
     uint8_t local_drive_mode = drive_mode;
     bool local_hazards = hazards;
+    bool local_crz_main = crz_main;
+    bool local_crz_inc = crz_inc;
+    bool local_crz_dec = crz_dec;
     bool local_battery_fault_active = battery_fault_active;
     portEXIT_CRITICAL(&stateMux);
 
@@ -255,6 +258,9 @@ void CANSteering::sendSteeringData() {
     digital_payload |= (right_lamp ? 1U : 0U) << 2;
     digital_payload |= (local_digital_data.direction_switch ? 1U : 0U) << 3;
     digital_payload |= (local_digital_data.horn ? 1U : 0U) << 4;
+    digital_payload |= (local_crz_main ? 1U : 0U) << 5;
+    digital_payload |= (local_crz_inc ? 1U : 0U) << 6;
+    digital_payload |= (local_crz_dec ? 1U : 0U) << 7;
 
     bool tx_ok = this->sendMessage(0x300, (void*)&digital_payload, sizeof(digital_payload), CAN_SEND_TIMEOUT_MS);
     send_success &= tx_ok;
