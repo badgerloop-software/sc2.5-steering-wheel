@@ -18,6 +18,8 @@ volatile float battery_high_cell_v = 0.0f;
 volatile float battery_low_cell_v = 0.0f;
 volatile float battery_pack_abs_current_a = 0.0f;
 volatile float battery_est_pack_v = 0.0f;
+volatile bool cruise_active = false;
+volatile float cruise_set_speed_mph = 0.0f;
 
 static volatile bool bps_src_505 = false;
 // static volatile bool bps_src_506 = false;
@@ -91,6 +93,9 @@ void CANSteering::readHandler(CanFrame msg) {
     bool update_stuff = false;
     float local_speedsig = 0.0f;
     bool update_speedsig = false;
+    bool local_cruise_active = false;
+    float local_cruise_set_speed_mph = 0.0f;
+    bool update_cruise = false;
 
     bool local_505 = false;
     bool update_505 = false;
@@ -138,6 +143,15 @@ void CANSteering::readHandler(CanFrame msg) {
             if (msg.data_length_code >= sizeof(float)) {
                 memcpy(&local_speedsig, msg.data, sizeof(float));
                 update_speedsig = true;
+            }
+            break;
+        }
+        case 0x305: {
+            // Cruise feedback: byte 0 is active, bytes 1-4 are set speed in MPH.
+            if (msg.data_length_code >= 1 + sizeof(float)) {
+                local_cruise_active = msg.data[0] != 0;
+                memcpy(&local_cruise_set_speed_mph, &msg.data[1], sizeof(float));
+                update_cruise = true;
             }
             break;
         }
@@ -221,6 +235,10 @@ void CANSteering::readHandler(CanFrame msg) {
     }
     if (update_speedsig) {
         speedsig = local_speedsig;
+    }
+    if (update_cruise) {
+        cruise_active = local_cruise_active;
+        cruise_set_speed_mph = local_cruise_set_speed_mph;
     }
     portEXIT_CRITICAL(&stateMux);
 }
