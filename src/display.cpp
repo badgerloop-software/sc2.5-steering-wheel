@@ -322,10 +322,11 @@ void renderMinimalDisplay(float speed) {
     tft.drawString("MPH", (WIDTH - tft.textWidth("MPH")) / 2, 193);
   }
 
-  updated |= updateRightAlignedText(centerX, 110, 220, 3, 0x61D6, driveModeText,
-                                    lastDriveModeText, sizeof(lastDriveModeText), 72);
-  updated |= updateLeftAlignedText(centerX, 110, 220, 3, 0x24BE, directionBuffer,
-                                     lastDirectionBuffer, sizeof(lastDirectionBuffer), 72);
+  // Keep direction and drive mode below the cruise widget, but above BMS telemetry.
+  updated |= updateRightAlignedText(centerX, 110, 232, 2, 0x61D6, driveModeText,
+                                    lastDriveModeText, sizeof(lastDriveModeText), 56);
+  updated |= updateLeftAlignedText(centerX, 110, 232, 2, 0x24BE, directionBuffer,
+                                   lastDirectionBuffer, sizeof(lastDirectionBuffer), 56);
 
   updated |= updateBitmapIfChanged(!hasPreviousFrame || batteryFault != lastBatteryFault,
                                    288, topRowY, image_bms_fault_bits, 96, 64,
