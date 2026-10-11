@@ -182,7 +182,6 @@ void renderMinimalDisplay(float speed) {
   static char lastRegenBuffer[8] = "";
   static char lastSpeedBuffer[12] = "";
   static char lastOdoBuffer[12] = "";
-  static char lastLapBuffer[12] = "";
   static char lastDirectionBuffer[4] = "";
   static char lastDriveModeText[4] = "";
   static char lastSocBuffer[12] = "";
@@ -254,7 +253,6 @@ void renderMinimalDisplay(float speed) {
   char regenBuffer[8];
   char speedBuffer[12];
   char odoBuffer[12];
-  char lapBuffer[12];
   char directionBuffer[4];
   char socBuffer[12];
   char packVBuffer[14];
@@ -295,7 +293,6 @@ void renderMinimalDisplay(float speed) {
   updated |= updatePercentField(90, 10, accelBuffer, lastAccelBuffer, sizeof(lastAccelBuffer), 56);
   updated |= updatePercentField(90, 30, regenBuffer, lastRegenBuffer, sizeof(lastRegenBuffer), 56);
   updated |= updateRightField(10, odoBuffer, lastOdoBuffer, sizeof(lastOdoBuffer), 120);
-  updated |= updateRightField(30, lapBuffer, lastLapBuffer, sizeof(lastLapBuffer), 120);
 
   updated |= updatePercentField(60, bmsY0, socBuffer, lastSocBuffer, sizeof(lastSocBuffer), 72);
   updated |= updatePercentField(260, bmsY0, packVBuffer, lastPackVBuffer, sizeof(lastPackVBuffer), 100);
