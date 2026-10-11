@@ -80,8 +80,6 @@ static void ensureStaticLayout() {
   tft.drawString("HiT", 10, bmsY0 + 36);
   tft.drawString("LoT", 200, bmsY0 + 36);
   tft.drawString("I", 10, bmsY0 + 54);
-  tft.drawString("Cruise", 10, 204);
-  tft.drawString("Set", 200, 204);
   drawn = true;
 }
 
@@ -194,8 +192,7 @@ void renderMinimalDisplay(float speed) {
   static char lastHiTempBuffer[12] = "";
   static char lastLoTempBuffer[12] = "";
   static char lastCurrentBuffer[12] = "";
-  static char lastCruiseStatusBuffer[12] = "";
-  static char lastCruiseSpeedBuffer[16] = "";
+  static char lastCruiseBuffer[24] = "";
   static bool lastHeadlight = false;
   static bool lastLeftBlinkLit = false;
   static bool lastRightBlinkLit = false;
@@ -266,8 +263,7 @@ void renderMinimalDisplay(float speed) {
   char hiTempBuffer[12];
   char loTempBuffer[12];
   char currentBuffer[12];
-  char cruiseStatusBuffer[12];
-  char cruiseSpeedBuffer[16];
+  char cruiseBuffer[24];
 
   snprintf(accelBuffer, sizeof(accelBuffer), "%02d%%", accelPercent);
   snprintf(regenBuffer, sizeof(regenBuffer), "%02d%%", regenPercent);
@@ -281,13 +277,11 @@ void renderMinimalDisplay(float speed) {
   snprintf(hiTempBuffer, sizeof(hiTempBuffer), "%.0fC", local_high_temp_c);
   snprintf(loTempBuffer, sizeof(loTempBuffer), "%.0fC", local_low_temp_c);
   snprintf(currentBuffer, sizeof(currentBuffer), "%.1fA", local_pack_abs_current_a);
-  snprintf(cruiseStatusBuffer, sizeof(cruiseStatusBuffer), "%s",
-           local_cruise_active ? "ON" : "OFF");
   if (local_cruise_active) {
-    snprintf(cruiseSpeedBuffer, sizeof(cruiseSpeedBuffer), "%.1f MPH",
+    snprintf(cruiseBuffer, sizeof(cruiseBuffer), "Cruise: %.1f MPH",
              local_cruise_set_speed_mph);
   } else {
-    snprintf(cruiseSpeedBuffer, sizeof(cruiseSpeedBuffer), "-- MPH");
+    snprintf(cruiseBuffer, sizeof(cruiseBuffer), "Cruise: OFF");
   }
 
   const char *driveModeText = currentDriveMode ? "Pwr" : "Eco";
@@ -310,10 +304,8 @@ void renderMinimalDisplay(float speed) {
   updated |= updatePercentField(60, bmsY0 + 36, hiTempBuffer, lastHiTempBuffer, sizeof(lastHiTempBuffer), 72);
   updated |= updatePercentField(260, bmsY0 + 36, loTempBuffer, lastLoTempBuffer, sizeof(lastLoTempBuffer), 72);
   updated |= updatePercentField(40, bmsY0 + 54, currentBuffer, lastCurrentBuffer, sizeof(lastCurrentBuffer), 100);
-  updated |= updatePercentField(10, 220, cruiseStatusBuffer, lastCruiseStatusBuffer,
-                                sizeof(lastCruiseStatusBuffer), 72);
-  updated |= updatePercentField(200, 220, cruiseSpeedBuffer, lastCruiseSpeedBuffer,
-                                sizeof(lastCruiseSpeedBuffer), 120);
+  updated |= updatePercentField(10, 212, cruiseBuffer, lastCruiseBuffer,
+                                sizeof(lastCruiseBuffer), 230);
 
   if (!hasPreviousFrame || speedValue != lastSpeedValue ||
       strncmp(speedBuffer, lastSpeedBuffer, sizeof(lastSpeedBuffer)) != 0) {
