@@ -4,7 +4,7 @@
 static const uint32_t CAN_SEND_TIMEOUT_MS = 10;
 
 float stuff = 0.0;
-float speedsig = 0.0;
+volatile float speedsig = 0.0f;
 
 bool send_success;
 volatile uint32_t can_messages_read = 0;
