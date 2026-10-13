@@ -27,10 +27,8 @@ static bool direction_input_armed = false;
 static bool drive_mode_state = false;
 static bool last_drive_mode_input = false;
 static bool last_regen_button_input = false;
-static bool last_crz_main_input = false;
 static bool last_crz_inc_input = false;
 static bool last_crz_dec_input = false;
-static bool cruise_setpoint_initialized = false;
 
 static const uint16_t MAX_ANALOG_VALUE = THROTTLE_SENT_MAX;
 
@@ -128,31 +126,9 @@ void sampleIO() {
     crz_inc = local_crz_inc && !last_crz_inc_input;
     crz_dec = local_crz_dec && !last_crz_dec_input;
 
-    // Reflect the driver's cruise request locally so the steering-wheel UI responds
-    // immediately, even before a PDC cruise-status frame arrives.  The PDC can still
-    // replace this state through CAN 0x305 when it has authoritative feedback.
-    if (!local_crz_main) {
-        cruise_active = false;
-        cruise_setpoint_initialized = false;
-    } else {
-        if (!last_crz_main_input || !cruise_setpoint_initialized) {
-            cruise_active = true;
-            cruise_set_speed_mph = speedsig;
-            cruise_setpoint_initialized = true;
-        }
+    // The PDC publishes the authoritative cruise state and target on CAN 0x210.
+    // Do not predict either one locally from switch input.
 
-        if (crz_inc) {
-            cruise_set_speed_mph += 1.0f;
-        }
-        if (crz_dec) {
-            cruise_set_speed_mph -= 1.0f;
-            if (cruise_set_speed_mph < 0.0f) {
-                cruise_set_speed_mph = 0.0f;
-            }
-        }
-    }
-
-    last_crz_main_input = local_crz_main;
     last_crz_inc_input = local_crz_inc;
     last_crz_dec_input = local_crz_dec;
 
@@ -182,7 +158,6 @@ void initIO() {
     last_hazards_input = digitalRead(HAZARDS_PIN);
     last_drive_mode_input = digitalRead(DRIVE_MODE_PIN);
     last_regen_button_input = digitalRead(REGEN_BRAKE_PIN);
-    last_crz_main_input = digitalRead(CRZ_MAIN_PIN);
     last_crz_inc_input = digitalRead(CRZ_INC_PIN);
     last_crz_dec_input = digitalRead(CRZ_DEC_PIN);
 

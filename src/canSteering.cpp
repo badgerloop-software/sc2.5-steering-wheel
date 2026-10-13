@@ -2,6 +2,7 @@
 #include "canSteering.h"
 
 static const uint32_t CAN_SEND_TIMEOUT_MS = 10;
+static const uint32_t CRUISE_STATUS_INPUT_ID = 0x210;
 
 float stuff = 0.0;
 volatile float speedsig = 0.0f;
@@ -146,11 +147,13 @@ void CANSteering::readHandler(CanFrame msg) {
             }
             break;
         }
-        case 0x305: {
-            // Cruise feedback: byte 0 is active, bytes 1-4 are set speed in MPH.
+        case CRUISE_STATUS_INPUT_ID: {
+            // PDC cruise status: byte 0 = active, bytes 1-4 = target MPH.
+            // This is emitted when the PDC accepts a target or state change.
             if (msg.data_length_code >= 1 + sizeof(float)) {
                 local_cruise_active = msg.data[0] != 0;
-                memcpy(&local_cruise_set_speed_mph, &msg.data[1], sizeof(float));
+                memcpy(&local_cruise_set_speed_mph, &msg.data[1],
+                       sizeof(local_cruise_set_speed_mph));
                 update_cruise = true;
             }
             break;
