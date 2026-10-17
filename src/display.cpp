@@ -182,7 +182,6 @@ void renderMinimalDisplay(float speed) {
   static char lastRegenBuffer[8] = "";
   static char lastSpeedBuffer[12] = "";
   static char lastOdoBuffer[12] = "";
-  static char lastLapBuffer[12] = "";
   static char lastDirectionBuffer[4] = "";
   static char lastDriveModeText[4] = "";
   static char lastSocBuffer[12] = "";
@@ -192,6 +191,7 @@ void renderMinimalDisplay(float speed) {
   static char lastHiTempBuffer[12] = "";
   static char lastLoTempBuffer[12] = "";
   static char lastCurrentBuffer[12] = "";
+  static char lastCruiseBuffer[24] = "";
   static bool lastHeadlight = false;
   static bool lastLeftBlinkLit = false;
   static bool lastRightBlinkLit = false;
@@ -213,7 +213,6 @@ void renderMinimalDisplay(float speed) {
   bool local_hazards = hazards;
   uint8_t local_drive_mode = drive_mode;
   bool local_battery_fault_active = battery_fault_active;
-  uint16_t local_lap_count = lap_count;
   float local_battery_soc = battery_soc;
   float local_low_temp_c = battery_low_temp_c;
   float local_high_temp_c = battery_high_temp_c;
@@ -221,6 +220,8 @@ void renderMinimalDisplay(float speed) {
   float local_low_cell_v = battery_low_cell_v;
   float local_pack_abs_current_a = battery_pack_abs_current_a;
   float local_est_pack_v = battery_est_pack_v;
+  bool local_cruise_active = cruise_active;
+  float local_cruise_set_speed_mph = cruise_set_speed_mph;
   portEXIT_CRITICAL(&stateMux);
 
   int accelPercent = (int)lroundf((local_throttle / (float)THROTTLE_SENT_MAX) * 100.0f);
@@ -252,7 +253,6 @@ void renderMinimalDisplay(float speed) {
   char regenBuffer[8];
   char speedBuffer[12];
   char odoBuffer[12];
-  char lapBuffer[12];
   char directionBuffer[4];
   char socBuffer[12];
   char packVBuffer[14];
@@ -261,12 +261,12 @@ void renderMinimalDisplay(float speed) {
   char hiTempBuffer[12];
   char loTempBuffer[12];
   char currentBuffer[12];
+  char cruiseBuffer[24];
 
   snprintf(accelBuffer, sizeof(accelBuffer), "%02d%%", accelPercent);
   snprintf(regenBuffer, sizeof(regenBuffer), "%02d%%", regenPercent);
   dtostrf(speed, 0, 1, speedBuffer);
   snprintf(odoBuffer, sizeof(odoBuffer), "%lu mi", (unsigned long)getOdometerMiles());
-  snprintf(lapBuffer, sizeof(lapBuffer), "Lap %u", (unsigned)local_lap_count);
   snprintf(directionBuffer, sizeof(directionBuffer), "%s", directionSwitch ? "Fwd" : "Rev");
   snprintf(socBuffer, sizeof(socBuffer), "%d%%", socPercent);
   snprintf(packVBuffer, sizeof(packVBuffer), "%.1fV", local_est_pack_v);
@@ -275,6 +275,12 @@ void renderMinimalDisplay(float speed) {
   snprintf(hiTempBuffer, sizeof(hiTempBuffer), "%.0fC", local_high_temp_c);
   snprintf(loTempBuffer, sizeof(loTempBuffer), "%.0fC", local_low_temp_c);
   snprintf(currentBuffer, sizeof(currentBuffer), "%.1fA", local_pack_abs_current_a);
+  if (local_cruise_active) {
+    snprintf(cruiseBuffer, sizeof(cruiseBuffer), "Cruise: %.1f MPH",
+             local_cruise_set_speed_mph);
+  } else {
+    snprintf(cruiseBuffer, sizeof(cruiseBuffer), "Cruise: OFF");
+  }
 
   const char *driveModeText = currentDriveMode ? "Pwr" : "Eco";
 
@@ -287,7 +293,6 @@ void renderMinimalDisplay(float speed) {
   updated |= updatePercentField(90, 10, accelBuffer, lastAccelBuffer, sizeof(lastAccelBuffer), 56);
   updated |= updatePercentField(90, 30, regenBuffer, lastRegenBuffer, sizeof(lastRegenBuffer), 56);
   updated |= updateRightField(10, odoBuffer, lastOdoBuffer, sizeof(lastOdoBuffer), 120);
-  updated |= updateRightField(30, lapBuffer, lastLapBuffer, sizeof(lastLapBuffer), 120);
 
   updated |= updatePercentField(60, bmsY0, socBuffer, lastSocBuffer, sizeof(lastSocBuffer), 72);
   updated |= updatePercentField(260, bmsY0, packVBuffer, lastPackVBuffer, sizeof(lastPackVBuffer), 100);
@@ -296,6 +301,8 @@ void renderMinimalDisplay(float speed) {
   updated |= updatePercentField(60, bmsY0 + 36, hiTempBuffer, lastHiTempBuffer, sizeof(lastHiTempBuffer), 72);
   updated |= updatePercentField(260, bmsY0 + 36, loTempBuffer, lastLoTempBuffer, sizeof(lastLoTempBuffer), 72);
   updated |= updatePercentField(40, bmsY0 + 54, currentBuffer, lastCurrentBuffer, sizeof(lastCurrentBuffer), 100);
+  updated |= updatePercentField(10, 212, cruiseBuffer, lastCruiseBuffer,
+                                sizeof(lastCruiseBuffer), 230);
 
   if (!hasPreviousFrame || speedValue != lastSpeedValue ||
       strncmp(speedBuffer, lastSpeedBuffer, sizeof(lastSpeedBuffer)) != 0) {
@@ -315,10 +322,11 @@ void renderMinimalDisplay(float speed) {
     tft.drawString("MPH", (WIDTH - tft.textWidth("MPH")) / 2, 193);
   }
 
-  updated |= updateRightAlignedText(centerX, 110, 220, 3, 0x61D6, driveModeText,
-                                    lastDriveModeText, sizeof(lastDriveModeText), 72);
-  updated |= updateLeftAlignedText(centerX, 110, 220, 3, 0x24BE, directionBuffer,
-                                     lastDirectionBuffer, sizeof(lastDirectionBuffer), 72);
+  // Keep direction and drive mode below the cruise widget, but above BMS telemetry.
+  updated |= updateRightAlignedText(centerX, 110, 232, 2, 0x61D6, driveModeText,
+                                    lastDriveModeText, sizeof(lastDriveModeText), 56);
+  updated |= updateLeftAlignedText(centerX, 110, 232, 2, 0x24BE, directionBuffer,
+                                   lastDirectionBuffer, sizeof(lastDirectionBuffer), 56);
 
   updated |= updateBitmapIfChanged(!hasPreviousFrame || batteryFault != lastBatteryFault,
                                    288, topRowY, image_bms_fault_bits, 96, 64,
