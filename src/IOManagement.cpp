@@ -22,7 +22,7 @@ static bool right_blink_state = false;
 static bool last_right_blink_input = false;
 static bool hazards_state = false;
 static bool last_hazards_input = false;
-static bool direction_switch_state = true;
+static bool direction_switch_state = false;
 static bool last_direction_switch_input = false;
 static bool direction_input_armed = false;
 static bool drive_mode_state = false;
@@ -188,10 +188,10 @@ void initIO() {
     decrease_button.candidate_since_ms = millis();
 
     // Default to forward on boot; first sampleIO() only seeds edge detection.
-    direction_switch_state = true;
+    direction_switch_state = false;
     direction_input_armed = false;
     portENTER_CRITICAL(&stateMux);
-    digital_data.direction_switch = true;
+    digital_data.direction_switch = false;
     portEXIT_CRITICAL(&stateMux);
 
     // Seed inputs once at startup so values are valid before first task execution.

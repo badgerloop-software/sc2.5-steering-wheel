@@ -34,4 +34,8 @@ extern volatile float speedsig;
 extern volatile bool cruise_active;
 extern volatile float cruise_set_speed_mph;
 
+extern volatile bool pdc_direction_reverse;
+extern volatile bool pdc_direction_received;
+extern volatile uint32_t pdc_direction_received_ms;
+
 #endif

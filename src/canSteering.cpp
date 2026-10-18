@@ -19,6 +19,9 @@ volatile float battery_high_cell_v = 0.0f;
 volatile float battery_low_cell_v = 0.0f;
 volatile float battery_pack_abs_current_a = 0.0f;
 volatile float battery_est_pack_v = 0.0f;
+volatile bool pdc_direction_reverse = false;
+volatile bool pdc_direction_received = false;
+volatile uint32_t pdc_direction_received_ms = 0;
 volatile bool cruise_active = false;
 volatile float cruise_set_speed_mph = 0.0f;
 
@@ -97,6 +100,8 @@ void CANSteering::readHandler(CanFrame msg) {
     bool local_cruise_active = false;
     float local_cruise_set_speed_mph = 0.0f;
     bool update_cruise = false;
+    bool update_direction = false;
+    bool local_direction_reverse = false;
 
     bool local_505 = false;
     bool update_505 = false;
@@ -137,6 +142,13 @@ void CANSteering::readHandler(CanFrame msg) {
 
         case 0x201:{
             // 0x201 is regen_brake from PCD — not used on display currently
+            break;
+        }
+        case 0x207: {
+            if (!msg.extd && !msg.rtr && msg.data_length_code >= 1) {
+                local_direction_reverse = (msg.data[0] & 1U) != 0;
+                update_direction = true;
+            }
             break;
         }
         case 0x208:{
@@ -209,6 +221,11 @@ void CANSteering::readHandler(CanFrame msg) {
 
     // 2. Commit updates under the spinlock critical section
     portENTER_CRITICAL(&stateMux);
+    if (update_direction) {
+        pdc_direction_reverse = local_direction_reverse;
+        pdc_direction_received = true;
+        pdc_direction_received_ms = millis();
+    }
     can_messages_read++;
     can_last_id = local_last_id;
     can_last_dlc = local_last_dlc;

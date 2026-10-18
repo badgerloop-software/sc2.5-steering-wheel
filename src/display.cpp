@@ -1,6 +1,7 @@
 #include "display.h"
 #include "IOManagement.h"
 #include "canSteering.h"
+#include "directionStatus.h"
 #include "odometer.h"
 #include <Arduino.h>
 #include <cstring>
@@ -182,7 +183,7 @@ void renderMinimalDisplay(float speed) {
   static char lastRegenBuffer[8] = "";
   static char lastSpeedBuffer[12] = "";
   static char lastOdoBuffer[12] = "";
-  static char lastDirectionBuffer[4] = "";
+  static char lastDirectionBuffer[32] = "";
   static char lastDriveModeText[4] = "";
   static char lastSocBuffer[12] = "";
   static char lastPackVBuffer[14] = "";
@@ -222,6 +223,9 @@ void renderMinimalDisplay(float speed) {
   float local_est_pack_v = battery_est_pack_v;
   bool local_cruise_active = cruise_active;
   float local_cruise_set_speed_mph = cruise_set_speed_mph;
+  const bool direction_status_received = pdc_direction_received;
+  const bool commanded_reverse = pdc_direction_reverse;
+  const uint32_t direction_received_ms = pdc_direction_received_ms;
   portEXIT_CRITICAL(&stateMux);
 
   int accelPercent = (int)lroundf((local_throttle / (float)THROTTLE_SENT_MAX) * 100.0f);
@@ -241,7 +245,7 @@ void renderMinimalDisplay(float speed) {
   bool rightBlink = local_digital_data.right_blink;
   bool hazardState = local_hazards;
   uint8_t currentDriveMode = local_drive_mode;
-  bool directionSwitch = local_digital_data.direction_switch;
+  bool requested_reverse = local_digital_data.direction_switch;
   bool batteryFault = local_battery_fault_active;
   bool blinkPhase = getBlinkPhase();
 
@@ -253,7 +257,7 @@ void renderMinimalDisplay(float speed) {
   char regenBuffer[8];
   char speedBuffer[12];
   char odoBuffer[12];
-  char directionBuffer[4];
+  char directionBuffer[32];
   char socBuffer[12];
   char packVBuffer[14];
   char hiCellBuffer[14];
@@ -267,7 +271,9 @@ void renderMinimalDisplay(float speed) {
   snprintf(regenBuffer, sizeof(regenBuffer), "%02d%%", regenPercent);
   dtostrf(speed, 0, 1, speedBuffer);
   snprintf(odoBuffer, sizeof(odoBuffer), "%lu mi", (unsigned long)getOdometerMiles());
-  snprintf(directionBuffer, sizeof(directionBuffer), "%s", directionSwitch ? "Fwd" : "Rev");
+  snprintf(directionBuffer, sizeof(directionBuffer), "%s",
+           directionStatusText(direction_status_received, direction_received_ms, millis(),
+                               commanded_reverse, requested_reverse));
   snprintf(socBuffer, sizeof(socBuffer), "%d%%", socPercent);
   snprintf(packVBuffer, sizeof(packVBuffer), "%.1fV", local_est_pack_v);
   snprintf(hiCellBuffer, sizeof(hiCellBuffer), "%.3fV", local_high_cell_v);
@@ -325,8 +331,15 @@ void renderMinimalDisplay(float speed) {
   // Keep direction and drive mode below the cruise widget, but above BMS telemetry.
   updated |= updateRightAlignedText(centerX, 110, 232, 2, 0x61D6, driveModeText,
                                     lastDriveModeText, sizeof(lastDriveModeText), 56);
-  updated |= updateLeftAlignedText(centerX, 110, 232, 2, 0x24BE, directionBuffer,
-                                   lastDirectionBuffer, sizeof(lastDirectionBuffer), 56);
+  // Clear a fixed area so shorter status text cannot leave old characters behind
+  if (strcmp(directionBuffer, lastDirectionBuffer) != 0) {
+    tft.fillRect(10, 232, 290, 16, TFT_BLACK);
+    tft.setTextColor(0x24BE);
+    tft.setTextSize(2);
+    tft.drawString(directionBuffer, 10, 232);
+    snprintf(lastDirectionBuffer, sizeof(lastDirectionBuffer), "%s", directionBuffer);
+    updated = true;
+  }
 
   updated |= updateBitmapIfChanged(!hasPreviousFrame || batteryFault != lastBatteryFault,
                                    288, topRowY, image_bms_fault_bits, 96, 64,
