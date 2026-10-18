@@ -257,6 +257,7 @@ void CANSteering::sendSteeringData() {
     Digital_Data local_digital_data = const_cast<Digital_Data&>(digital_data);
     uint8_t local_drive_mode = drive_mode;
     bool local_hazards = hazards;
+    bool local_regen_button_pressed = regen_button_pressed;
     bool local_crz_main = crz_main;
     bool local_crz_inc = crz_inc;
     bool local_crz_dec = crz_dec;
@@ -283,7 +284,10 @@ void CANSteering::sendSteeringData() {
     digital_payload |= (local_crz_inc ? 1U : 0U) << 6;
     digital_payload |= (local_crz_dec ? 1U : 0U) << 7;
 
-    bool tx_ok = this->sendMessage(0x300, (void*)&digital_payload, sizeof(digital_payload), CAN_SEND_TIMEOUT_MS);
+    uint8_t control_payload[2] = {
+        digital_payload, static_cast<uint8_t>(local_regen_button_pressed ? 1U : 0U)
+    };
+    bool tx_ok = this->sendMessage(0x300, control_payload, sizeof(control_payload), CAN_SEND_TIMEOUT_MS);
     send_success &= tx_ok;
 
     tx_ok = this->sendMessage(0x301, (void*)&regen_brake_normalized, sizeof(float), CAN_SEND_TIMEOUT_MS);

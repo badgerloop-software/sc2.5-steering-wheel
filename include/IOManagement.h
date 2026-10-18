@@ -57,6 +57,7 @@ extern volatile uint8_t regen_brake_percent;
 extern volatile float throttle;
 extern volatile bool hazards;
 extern volatile uint8_t drive_mode;
+extern volatile bool regen_button_pressed;
 extern volatile bool crz_main;
 extern volatile bool crz_inc;
 extern volatile bool crz_dec;
