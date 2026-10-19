@@ -9,8 +9,6 @@
 
 CANSteering* canSteering = nullptr;
 
-extern float speedsig;
-
 // Task implementations
 void ioTask(void* pvParameters) {
     TickType_t lastWakeTime = xTaskGetTickCount();

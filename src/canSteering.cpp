@@ -2,9 +2,10 @@
 #include "canSteering.h"
 
 static const uint32_t CAN_SEND_TIMEOUT_MS = 10;
+static const uint32_t CRUISE_STATUS_INPUT_ID = 0x210;
 
 float stuff = 0.0;
-float speedsig = 0.0;
+volatile float speedsig = 0.0f;
 
 bool send_success;
 volatile uint32_t can_messages_read = 0;
@@ -18,6 +19,11 @@ volatile float battery_high_cell_v = 0.0f;
 volatile float battery_low_cell_v = 0.0f;
 volatile float battery_pack_abs_current_a = 0.0f;
 volatile float battery_est_pack_v = 0.0f;
+volatile bool pdc_direction_reverse = false;
+volatile bool pdc_direction_received = false;
+volatile uint32_t pdc_direction_received_ms = 0;
+volatile bool cruise_active = false;
+volatile float cruise_set_speed_mph = 0.0f;
 
 static volatile bool bps_src_505 = false;
 // static volatile bool bps_src_506 = false;
@@ -91,6 +97,11 @@ void CANSteering::readHandler(CanFrame msg) {
     bool update_stuff = false;
     float local_speedsig = 0.0f;
     bool update_speedsig = false;
+    bool local_cruise_active = false;
+    float local_cruise_set_speed_mph = 0.0f;
+    bool update_cruise = false;
+    bool update_direction = false;
+    bool local_direction_reverse = false;
 
     bool local_505 = false;
     bool update_505 = false;
@@ -133,11 +144,29 @@ void CANSteering::readHandler(CanFrame msg) {
             // 0x201 is regen_brake from PCD — not used on display currently
             break;
         }
+        case 0x207: {
+            if (!msg.extd && !msg.rtr && msg.data_length_code >= 1) {
+                local_direction_reverse = (msg.data[0] & 1U) != 0;
+                update_direction = true;
+            }
+            break;
+        }
         case 0x208:{
             // mph from PCD (matches canPDC.cpp sendMessage(0x208, &mph, ...))
             if (msg.data_length_code >= sizeof(float)) {
                 memcpy(&local_speedsig, msg.data, sizeof(float));
                 update_speedsig = true;
+            }
+            break;
+        }
+        case CRUISE_STATUS_INPUT_ID: {
+            // PDC cruise status: byte 0 = active, bytes 1-4 = target MPH.
+            // This is emitted when the PDC accepts a target or state change.
+            if (msg.data_length_code >= 1 + sizeof(float)) {
+                local_cruise_active = msg.data[0] != 0;
+                memcpy(&local_cruise_set_speed_mph, &msg.data[1],
+                       sizeof(local_cruise_set_speed_mph));
+                update_cruise = true;
             }
             break;
         }
@@ -192,6 +221,11 @@ void CANSteering::readHandler(CanFrame msg) {
 
     // 2. Commit updates under the spinlock critical section
     portENTER_CRITICAL(&stateMux);
+    if (update_direction) {
+        pdc_direction_reverse = local_direction_reverse;
+        pdc_direction_received = true;
+        pdc_direction_received_ms = millis();
+    }
     can_messages_read++;
     can_last_id = local_last_id;
     can_last_dlc = local_last_dlc;
@@ -222,6 +256,10 @@ void CANSteering::readHandler(CanFrame msg) {
     if (update_speedsig) {
         speedsig = local_speedsig;
     }
+    if (update_cruise) {
+        cruise_active = local_cruise_active;
+        cruise_set_speed_mph = local_cruise_set_speed_mph;
+    }
     portEXIT_CRITICAL(&stateMux);
 }
 
@@ -236,6 +274,10 @@ void CANSteering::sendSteeringData() {
     Digital_Data local_digital_data = const_cast<Digital_Data&>(digital_data);
     uint8_t local_drive_mode = drive_mode;
     bool local_hazards = hazards;
+    bool local_regen_button_pressed = regen_button_pressed;
+    bool local_crz_main = crz_main;
+    bool local_crz_inc = crz_inc;
+    bool local_crz_dec = crz_dec;
     bool local_battery_fault_active = battery_fault_active;
     portEXIT_CRITICAL(&stateMux);
 
@@ -255,8 +297,14 @@ void CANSteering::sendSteeringData() {
     digital_payload |= (right_lamp ? 1U : 0U) << 2;
     digital_payload |= (local_digital_data.direction_switch ? 1U : 0U) << 3;
     digital_payload |= (local_digital_data.horn ? 1U : 0U) << 4;
+    digital_payload |= (local_crz_main ? 1U : 0U) << 5;
+    digital_payload |= (local_crz_inc ? 1U : 0U) << 6;
+    digital_payload |= (local_crz_dec ? 1U : 0U) << 7;
 
-    bool tx_ok = this->sendMessage(0x300, (void*)&digital_payload, sizeof(digital_payload), CAN_SEND_TIMEOUT_MS);
+    uint8_t control_payload[2] = {
+        digital_payload, static_cast<uint8_t>(local_regen_button_pressed ? 1U : 0U)
+    };
+    bool tx_ok = this->sendMessage(0x300, control_payload, sizeof(control_payload), CAN_SEND_TIMEOUT_MS);
     send_success &= tx_ok;
 
     tx_ok = this->sendMessage(0x301, (void*)&regen_brake_normalized, sizeof(float), CAN_SEND_TIMEOUT_MS);

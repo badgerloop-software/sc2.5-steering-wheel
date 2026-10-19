@@ -1,4 +1,5 @@
 #include "IOManagement.h"
+#include "canSteering.h"
 
 volatile Digital_Data digital_data;
 volatile float regen_brake;
@@ -7,7 +8,10 @@ volatile float throttle;
 volatile uint16_t number_reads = 0;
 volatile bool hazards = 0;
 volatile uint8_t drive_mode = 0;
-volatile uint16_t lap_count = 0;
+volatile bool regen_button_pressed = false;
+volatile bool crz_main = false;
+volatile bool crz_inc = false;
+volatile bool crz_dec = false;
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
 
 static bool headlight_state = false;
@@ -18,14 +22,31 @@ static bool right_blink_state = false;
 static bool last_right_blink_input = false;
 static bool hazards_state = false;
 static bool last_hazards_input = false;
-static bool direction_switch_state = true;
+static bool direction_switch_state = false;
 static bool last_direction_switch_input = false;
 static bool direction_input_armed = false;
 static bool drive_mode_state = false;
 static bool last_drive_mode_input = false;
 static bool last_regen_button_input = false;
-static bool last_crz_set_input = false;
-static bool last_crz_reset_input = false;
+struct DebouncedCruiseButton {
+    bool candidate_pressed = false;
+    bool stable_pressed = false;
+    uint32_t candidate_since_ms = 0;
+
+    bool update(bool raw_pressed, uint32_t current_time_ms) {
+        if (raw_pressed != candidate_pressed) {
+            candidate_pressed = raw_pressed;
+            candidate_since_ms = current_time_ms;
+        }
+        if (uint32_t(current_time_ms - candidate_since_ms) >= 20U) {
+            stable_pressed = candidate_pressed;
+        }
+        return stable_pressed;
+    }
+};
+
+static DebouncedCruiseButton increase_button;
+static DebouncedCruiseButton decrease_button;
 
 static const uint16_t MAX_ANALOG_VALUE = THROTTLE_SENT_MAX;
 
@@ -49,8 +70,13 @@ void sampleIO() {
     bool local_horn = digitalRead(HORN_PIN);
     bool local_hazards = digitalRead(HAZARDS_PIN);
     bool local_drive_mode = digitalRead(DRIVE_MODE_PIN);
-    bool local_crz_set = digitalRead(CRZ_SET_PIN);
-    bool local_crz_reset = digitalRead(CRZ_RESET_PIN);
+    bool local_crz_main = digitalRead(CRZ_MAIN_PIN);
+    bool local_crz_inc = digitalRead(CRZ_INC_PIN);
+    bool local_crz_dec = digitalRead(CRZ_DEC_PIN);
+
+    const uint32_t current_time_ms = millis();
+    const bool increase_pressed = increase_button.update(local_crz_inc, current_time_ms);
+    const bool decrease_pressed = decrease_button.update(local_crz_dec, current_time_ms);
 
     // 2. Perform calibration calculations
     float pedal_calibrated = calibratePedal(local_throttle_raw);
@@ -118,20 +144,15 @@ void sampleIO() {
     }
     drive_mode = toggleOnPress(local_drive_mode, drive_mode_state, last_drive_mode_input);
 
-    // Cruise set/reset unused — edge-detect for lap counter instead
-    if (local_crz_set && !last_crz_set_input) {
-        if (lap_count < 999) {
-            lap_count++;
-        }
-    }
-    last_crz_set_input = local_crz_set;
+    crz_main = local_crz_main;
+    regen_button_pressed = local_regen_button;
+    crz_inc = increase_pressed;
+    crz_dec = decrease_pressed;
 
-    if (local_crz_reset && !last_crz_reset_input) {
-        if (lap_count > 0) {
-            lap_count--;
-        }
-    }
-    last_crz_reset_input = local_crz_reset;
+    // The PDC publishes the authoritative cruise state and target on CAN 0x210.
+    // Do not predict either one locally from switch input.
+
+
 
     number_reads++;
 
@@ -148,8 +169,9 @@ void initIO() {
     pinMode(HORN_PIN, INPUT);
     pinMode(HAZARDS_PIN, INPUT);
     pinMode(DRIVE_MODE_PIN, INPUT);
-    pinMode(CRZ_SET_PIN, INPUT);
-    pinMode(CRZ_RESET_PIN, INPUT);
+    pinMode(CRZ_MAIN_PIN, INPUT);
+    pinMode(CRZ_INC_PIN, INPUT);
+    pinMode(CRZ_DEC_PIN, INPUT);
 
     last_headlight_input = digitalRead(HEADLIGHT_PIN);
     last_left_blink_input = digitalRead(LEFT_BLINK_PIN);
@@ -158,14 +180,18 @@ void initIO() {
     last_hazards_input = digitalRead(HAZARDS_PIN);
     last_drive_mode_input = digitalRead(DRIVE_MODE_PIN);
     last_regen_button_input = digitalRead(REGEN_BRAKE_PIN);
-    last_crz_set_input = digitalRead(CRZ_SET_PIN);
-    last_crz_reset_input = digitalRead(CRZ_RESET_PIN);
+    increase_button.candidate_pressed = digitalRead(CRZ_INC_PIN);
+    increase_button.stable_pressed = increase_button.candidate_pressed;
+    increase_button.candidate_since_ms = millis();
+    decrease_button.candidate_pressed = digitalRead(CRZ_DEC_PIN);
+    decrease_button.stable_pressed = decrease_button.candidate_pressed;
+    decrease_button.candidate_since_ms = millis();
 
     // Default to forward on boot; first sampleIO() only seeds edge detection.
-    direction_switch_state = true;
+    direction_switch_state = false;
     direction_input_armed = false;
     portENTER_CRITICAL(&stateMux);
-    digital_data.direction_switch = true;
+    digital_data.direction_switch = false;
     portEXIT_CRITICAL(&stateMux);
 
     // Seed inputs once at startup so values are valid before first task execution.

@@ -30,5 +30,12 @@ extern volatile float battery_high_cell_v;
 extern volatile float battery_low_cell_v;
 extern volatile float battery_pack_abs_current_a;
 extern volatile float battery_est_pack_v;
+extern volatile float speedsig;
+extern volatile bool cruise_active;
+extern volatile float cruise_set_speed_mph;
+
+extern volatile bool pdc_direction_reverse;
+extern volatile bool pdc_direction_received;
+extern volatile uint32_t pdc_direction_received_ms;
 
 #endif
