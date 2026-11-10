@@ -27,8 +27,6 @@ static bool last_direction_switch_input = false;
 static bool direction_input_armed = false;
 static bool drive_mode_state = false;
 static bool last_drive_mode_input = false;
-static bool cruise_main_state = false;
-static bool last_cruise_main_input = false;
 static bool last_regen_button_input = false;
 struct DebouncedCruiseButton {
     bool candidate_pressed = false;
@@ -47,6 +45,7 @@ struct DebouncedCruiseButton {
     }
 };
 
+static DebouncedCruiseButton main_button;
 static DebouncedCruiseButton increase_button;
 static DebouncedCruiseButton decrease_button;
 
@@ -77,6 +76,7 @@ void sampleIO() {
     bool local_crz_dec = digitalRead(CRZ_DEC_PIN);
 
     const uint32_t current_time_ms = millis();
+    const bool main_pressed = main_button.update(local_crz_main, current_time_ms);
     const bool increase_pressed = increase_button.update(local_crz_inc, current_time_ms);
     const bool decrease_pressed = decrease_button.update(local_crz_dec, current_time_ms);
 
@@ -146,7 +146,7 @@ void sampleIO() {
     }
     drive_mode = toggleOnPress(local_drive_mode, drive_mode_state, last_drive_mode_input);
 
-    crz_main = toggleOnPress(local_crz_main, cruise_main_state, last_cruise_main_input);
+    crz_main = main_pressed;
     regen_button_pressed = local_regen_button;
     crz_inc = increase_pressed;
     crz_dec = decrease_pressed;
@@ -181,7 +181,9 @@ void initIO() {
     last_direction_switch_input = digitalRead(DIRECTION_SWITCH_PIN);
     last_hazards_input = digitalRead(HAZARDS_PIN);
     last_drive_mode_input = digitalRead(DRIVE_MODE_PIN);
-    last_cruise_main_input = digitalRead(CRZ_MAIN_PIN);
+    main_button.candidate_pressed = digitalRead(CRZ_MAIN_PIN);
+    main_button.stable_pressed = main_button.candidate_pressed;
+    main_button.candidate_since_ms = millis();
     last_regen_button_input = digitalRead(REGEN_BRAKE_PIN);
     increase_button.candidate_pressed = digitalRead(CRZ_INC_PIN);
     increase_button.stable_pressed = increase_button.candidate_pressed;
