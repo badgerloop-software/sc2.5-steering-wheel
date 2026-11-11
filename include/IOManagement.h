@@ -17,8 +17,9 @@
 #define THROTTLE_PIN 12
 #define HAZARDS_PIN 14
 #define DRIVE_MODE_PIN 4
-#define CRZ_SET_PIN 26    // crz_inc — lap increment (cruise unused)
-#define CRZ_RESET_PIN 27  // crz_dec — lap decrement (cruise unused)
+#define CRZ_MAIN_PIN 25
+#define CRZ_INC_PIN 26
+#define CRZ_DEC_PIN 27
 
 #define IO_UPDATE_PERIOD 100000 // us
 
@@ -56,8 +57,11 @@ extern volatile uint8_t regen_brake_percent;
 extern volatile float throttle;
 extern volatile bool hazards;
 extern volatile uint8_t drive_mode;
+extern volatile bool regen_button_pressed;
+extern volatile bool crz_main;
+extern volatile bool crz_inc;
+extern volatile bool crz_dec;
 extern volatile uint16_t number_reads;
-extern volatile uint16_t lap_count;
 
 extern portMUX_TYPE stateMux;
 

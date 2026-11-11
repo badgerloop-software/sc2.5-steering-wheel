@@ -24,7 +24,7 @@ The board sends driver IO on CAN. The display shows various data about the cars 
 
 ## Modules
 
-1. `IOManagement` reads pins, sets pedal scale, toggles buttons, and counts laps.
+1. `IOManagement` reads pins, sets pedal scale, toggles buttons, and sets cruise control.
 2. `canSteering` receives BMS, speed, and fault frames. It sends `0x300` through `0x304`.
 3. `display` draws the UI.
 4. `odometer` stores tenths of a mile in NVS.
@@ -57,8 +57,8 @@ Receive:
 | Horn | 33 |
 | Hazards | 14 |
 | Drive mode | 4 |
-| Lap increment | 26 |
-| Lap decrement | 27 |
+| Cruise increment | 26 |
+| Cruise decrement | 27 |
 | CAN TX | 21 |
 | CAN RX | 22 |
 | TFT CS | 15 |
